@@ -22,6 +22,7 @@
 #include <cwchar>
 #include <limits>
 #include <mutex>
+#include <utility>
 #include <new>
 
 namespace {
@@ -555,6 +556,36 @@ extern "C" FfxVkPortableResult ffxVkPortableUpscaleContextGetMemoryUsage(
         return fromFfxResult(result);
     usage->totalUsageInBytes = ffxUsage.totalUsageInBytes;
     usage->aliasableUsageInBytes = ffxUsage.aliasableUsageInBytes;
+    return FFX_VK_PORTABLE_OK;
+}
+
+extern "C" FfxVkPortableResult ffxVkPortableUpscaleContextSetTuning(
+    FfxVkPortableUpscaleContext* context,
+    const FfxVkPortableUpscaleTuning* tuning)
+{
+    if (context == nullptr || tuning == nullptr)
+        return FFX_VK_PORTABLE_ERROR_INVALID_POINTER;
+    if (tuning->structSize < sizeof(*tuning))
+        return FFX_VK_PORTABLE_ERROR_INVALID_STRUCT_SIZE;
+    if (context->magic != kContextMagic || !context->ffxContextCreated)
+        return FFX_VK_PORTABLE_ERROR_INVALID_ARGUMENT;
+
+    std::lock_guard<std::mutex> lock(context->mutex);
+    const std::pair<FfxFsr3UpscalerConfigureKey, float> values[] = {
+        {FFX_FSR3UPSCALER_CONFIGURE_UPSCALE_KEY_FVELOCITYFACTOR, tuning->velocityFactor},
+        {FFX_FSR3UPSCALER_CONFIGURE_UPSCALE_KEY_FREACTIVENESSSCALE, tuning->reactivenessScale},
+        {FFX_FSR3UPSCALER_CONFIGURE_UPSCALE_KEY_FSHADINGCHANGESCALE, tuning->shadingChangeScale},
+        {FFX_FSR3UPSCALER_CONFIGURE_UPSCALE_KEY_FACCUMULATIONADDEDPERFRAME,
+         tuning->accumulationAddedPerFrame},
+        {FFX_FSR3UPSCALER_CONFIGURE_UPSCALE_KEY_FMINDISOCCLUSIONACCUMULATION,
+         tuning->minDisocclusionAccumulation},
+    };
+    for (const auto& [key, value] : values) {
+        float v = value;
+        const FfxErrorCode result = ffxFsr3UpscalerSetConstant(&context->ffxContext, key, &v);
+        if (result != FFX_OK)
+            return fromFfxResult(result);
+    }
     return FFX_VK_PORTABLE_OK;
 }
 

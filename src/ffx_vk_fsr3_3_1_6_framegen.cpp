@@ -463,6 +463,13 @@ ffxVkFsr3_3_1_6FrameGenerationContextRecordPrepare(
         !valid_image(info->depth, VK_FORMAT_R32_SFLOAT, info->renderWidth, info->renderHeight, false) ||
         !valid_motion_image(info->motionVectors, info->renderWidth, info->renderHeight))
         return FFX_VK_FSR3_3_1_6_FRAMEGEN_ERROR_INVALID_ARGUMENT;
+    /* bbport: tag this frame's bridge allocations (staged constant buffers, descriptor sets)
+     * with its id, as the upscaler wrapper does, so RetireFrame can free them once the GPU is
+     * past it. Untagged ones (id 0) were kept forever: VRAM grew about 60 MiB/s until the
+     * device was lost. Id 0 is reserved for the bridge's own long-lived allocations. */
+    if (info->frameId == 0u)
+        return FFX_VK_FSR3_3_1_6_FRAMEGEN_ERROR_INVALID_ARGUMENT;
+    ffxVkFsr3_3_1_5BridgeBeginFrame(context->bridge, info->frameId);
     if (!context->initialized) {
         const OwnedSharedImage shared[] = {
             context->opticalFlowVector, context->opticalFlowScd, context->dilatedDepth,
@@ -676,6 +683,8 @@ ffxVkFsr3_3_1_6FrameGenerationContextRetireFrame(
             ++retained;
         }
     }
+    /* bbport: and the bridge's per-frame constant buffers and descriptor sets through it. */
+    ffxVkFsr3_3_1_5BridgeRetireFrame(context->bridge, completedFrameId);
     return FFX_VK_FSR3_3_1_6_FRAMEGEN_OK;
 }
 

@@ -314,6 +314,24 @@ FfxVkPortableResult ffxVkPortableUpscaleContextGetMemoryUsage(
     FfxVkPortableMemoryUsage* usage);
 
 /*
+ * Lantern Engine: FSR 3.1's tuning constants (ffxFsr3UpscalerSetConstant), kept by the context
+ * for the dispatches that follow.  The SDK's defaults: velocityFactor 1, reactivenessScale 1,
+ * shadingChangeScale 1, accumulationAddedPerFrame 0.333, minDisocclusionAccumulation -0.333.
+ */
+typedef struct FfxVkPortableUpscaleTuning {
+    uint32_t structSize;
+    float velocityFactor;              /* [0, 1]: lower steadies bright pixels in motion */
+    float reactivenessScale;           /* [0, inf): scales the reactive mask */
+    float shadingChangeScale;          /* [0, inf): reacts more to shading changes */
+    float accumulationAddedPerFrame;   /* [0, 1]: lower ghosts less, thin details flicker more */
+    float minDisocclusionAccumulation; /* [-1, 1]: higher flickers less at disocclusions */
+} FfxVkPortableUpscaleTuning;
+
+FfxVkPortableResult ffxVkPortableUpscaleContextSetTuning(
+    FfxVkPortableUpscaleContext* context,
+    const FfxVkPortableUpscaleTuning* tuning);
+
+/*
  * Record one upscaler dispatch into an already-recording primary or secondary
  * command buffer.  No queue submission or wait is performed.  Calls for a
  * single context must be externally serialized and submitted in record order.
